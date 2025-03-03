@@ -14,10 +14,11 @@
 #
 
 import os
-from typing import Optional, Union
+from typing import Dict, Optional, Union
+
+import pydantic
 
 import google.auth
-import pydantic
 
 from ._api_client import ApiClient, HttpOptions, HttpOptionsDict
 from ._replay_api_client import ReplayApiClient
@@ -32,255 +33,255 @@ from .tunings import AsyncTunings, Tunings
 
 
 class AsyncClient:
-  """Client for making asynchronous (non-blocking) requests."""
+    """Client for making asynchronous (non-blocking) requests."""
 
-  def __init__(self, api_client: ApiClient):
+    def __init__(self, api_client: ApiClient):
+        self._api_client = api_client
+        self._models = AsyncModels(self._api_client)
+        self._tunings = AsyncTunings(self._api_client)
+        self._caches = AsyncCaches(self._api_client)
+        self._batches = AsyncBatches(self._api_client)
+        self._files = AsyncFiles(self._api_client)
+        self._live = AsyncLive(self._api_client)
+        self._operations = AsyncOperations(self._api_client)
 
-    self._api_client = api_client
-    self._models = AsyncModels(self._api_client)
-    self._tunings = AsyncTunings(self._api_client)
-    self._caches = AsyncCaches(self._api_client)
-    self._batches = AsyncBatches(self._api_client)
-    self._files = AsyncFiles(self._api_client)
-    self._live = AsyncLive(self._api_client)
-    self._operations = AsyncOperations(self._api_client)
+    @property
+    def models(self) -> AsyncModels:
+        return self._models
 
-  @property
-  def models(self) -> AsyncModels:
-    return self._models
+    @property
+    def tunings(self) -> AsyncTunings:
+        return self._tunings
 
-  @property
-  def tunings(self) -> AsyncTunings:
-    return self._tunings
+    @property
+    def caches(self) -> AsyncCaches:
+        return self._caches
 
-  @property
-  def caches(self) -> AsyncCaches:
-    return self._caches
+    @property
+    def batches(self) -> AsyncBatches:
+        return self._batches
 
-  @property
-  def batches(self) -> AsyncBatches:
-    return self._batches
+    @property
+    def chats(self) -> AsyncChats:
+        return AsyncChats(modules=self.models)
 
-  @property
-  def chats(self) -> AsyncChats:
-    return AsyncChats(modules=self.models)
+    @property
+    def files(self) -> AsyncFiles:
+        return self._files
 
-  @property
-  def files(self) -> AsyncFiles:
-    return self._files
+    @property
+    def live(self) -> AsyncLive:
+        return self._live
 
-  @property
-  def live(self) -> AsyncLive:
-    return self._live
+    @property
+    def operations(self) -> AsyncOperations:
+        return self._operations
 
-  @property
-  def operations(self) -> AsyncOperations:
-    return self._operations
 
 class DebugConfig(pydantic.BaseModel):
-  """Configuration options that change client network behavior when testing."""
+    """Configuration options that change client network behavior when testing."""
 
-  client_mode: Optional[str] = pydantic.Field(
-      default_factory=lambda: os.getenv('GOOGLE_GENAI_CLIENT_MODE', None)
-  )
+    client_mode: Optional[str] = pydantic.Field(
+        default_factory=lambda: os.getenv("GOOGLE_GENAI_CLIENT_MODE", None)
+    )
 
-  replays_directory: Optional[str] = pydantic.Field(
-      default_factory=lambda: os.getenv('GOOGLE_GENAI_REPLAYS_DIRECTORY', None)
-  )
+    replays_directory: Optional[str] = pydantic.Field(
+        default_factory=lambda: os.getenv("GOOGLE_GENAI_REPLAYS_DIRECTORY", None)
+    )
 
-  replay_id: Optional[str] = pydantic.Field(
-      default_factory=lambda: os.getenv('GOOGLE_GENAI_REPLAY_ID', None)
-  )
+    replay_id: Optional[str] = pydantic.Field(
+        default_factory=lambda: os.getenv("GOOGLE_GENAI_REPLAY_ID", None)
+    )
 
 
 class Client:
-  """Client for making synchronous requests.
+    """Client for making synchronous requests.
 
-  Use this client to make a request to the Gemini Developer API or Vertex AI
-  API and then wait for the response.
+    Use this client to make a request to the Gemini Developer API or Vertex AI
+    API and then wait for the response.
 
-  To initialize the client, provide the required arguments either directly
-  or by using environment variables. Gemini API users and Vertex AI users in
-  express mode can provide API key by providing input argument
-  `api_key="your-api-key"` or by defining `GOOGLE_API_KEY="your-api-key"` as an
-  environment variable
+    To initialize the client, provide the required arguments either directly
+    or by using environment variables. Gemini API users and Vertex AI users in
+    express mode can provide API key by providing input argument
+    `api_key="your-api-key"` or by defining `GOOGLE_API_KEY="your-api-key"` as an
+    environment variable
 
-  Vertex AI API users can provide inputs argument as `vertexai=True,
-  project="your-project-id", location="us-central1"` or by defining
-  `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_CLOUD_PROJECT` and
-  `GOOGLE_CLOUD_LOCATION` environment variables.
+    Vertex AI API users can provide inputs argument as `vertexai=True,
+    project="your-project-id", location="us-central1"` or by defining
+    `GOOGLE_GENAI_USE_VERTEXAI=true`, `GOOGLE_CLOUD_PROJECT` and
+    `GOOGLE_CLOUD_LOCATION` environment variables.
 
-  Attributes:
-    api_key: The `API key <https://ai.google.dev/gemini-api/docs/api-key>`_ to
-      use for authentication. Applies to the Gemini Developer API only.
-    vertexai: Indicates whether the client should use the Vertex AI
-      API endpoints. Defaults to False (uses Gemini Developer API endpoints).
-      Applies to the Vertex AI API only.
-    credentials: The credentials to use for authentication when calling the
-      Vertex AI APIs. Credentials can be obtained from environment variables and
-      default credentials. For more information, see
-      `Set up Application Default Credentials
-      <https://cloud.google.com/docs/authentication/provide-credentials-adc>`_.
-      Applies to the Vertex AI API only.
-    project: The `Google Cloud project ID <https://cloud.google.com/vertex-ai/docs/start/cloud-environment>`_ to
-      use for quota. Can be obtained from environment variables (for example,
-      ``GOOGLE_CLOUD_PROJECT``). Applies to the Vertex AI API only.
-    location: The `location <https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations>`_
-      to send API requests to (for example, ``us-central1``). Can be obtained
-      from environment variables. Applies to the Vertex AI API only.
-    debug_config: Config settings that control network behavior of the client.
-      This is typically used when running test code.
-    http_options: Http options to use for the client. Response_payload can't be
-      set when passing to the client constructor.
+    Attributes:
+      api_key: The `API key <https://ai.google.dev/gemini-api/docs/api-key>`_ to
+        use for authentication. Applies to the Gemini Developer API only.
+      vertexai: Indicates whether the client should use the Vertex AI
+        API endpoints. Defaults to False (uses Gemini Developer API endpoints).
+        Applies to the Vertex AI API only.
+      credentials: The credentials to use for authentication when calling the
+        Vertex AI APIs. Credentials can be obtained from environment variables and
+        default credentials. For more information, see
+        `Set up Application Default Credentials
+        <https://cloud.google.com/docs/authentication/provide-credentials-adc>`_.
+        Applies to the Vertex AI API only.
+      project: The `Google Cloud project ID <https://cloud.google.com/vertex-ai/docs/start/cloud-environment>`_ to
+        use for quota. Can be obtained from environment variables (for example,
+        ``GOOGLE_CLOUD_PROJECT``). Applies to the Vertex AI API only.
+      location: The `location <https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations>`_
+        to send API requests to (for example, ``us-central1``). Can be obtained
+        from environment variables. Applies to the Vertex AI API only.
+      debug_config: Config settings that control network behavior of the client.
+        This is typically used when running test code.
+      http_options: Http options to use for the client. Response_payload can't be
+        set when passing to the client constructor.
 
-  Usage for the Gemini Developer API:
+    Usage for the Gemini Developer API:
 
-  .. code-block:: python
+    .. code-block:: python
 
-    from google import genai
+      from google import genai
 
-    client = genai.Client(api_key='my-api-key')
+      client = genai.Client(api_key='my-api-key')
 
-  Usage for the Vertex AI API:
+    Usage for the Vertex AI API:
 
-  .. code-block:: python
+    .. code-block:: python
 
-    from google import genai
+      from google import genai
 
-    client = genai.Client(
-        vertexai=True, project='my-project-id', location='us-central1'
-    )
-  """
-
-  def __init__(
-      self,
-      *,
-      vertexai: Optional[bool] = None,
-      api_key: Optional[str] = None,
-      credentials: Optional[google.auth.credentials.Credentials] = None,
-      project: Optional[str] = None,
-      location: Optional[str] = None,
-      debug_config: Optional[DebugConfig] = None,
-      http_options: Optional[Union[HttpOptions, HttpOptionsDict]] = None,
-  ):
-    """Initializes the client.
-
-    Args:
-       vertexai (bool): Indicates whether the client should use the Vertex AI
-         API endpoints. Defaults to False (uses Gemini Developer API endpoints).
-         Applies to the Vertex AI API only.
-       api_key (str): The `API key
-         <https://ai.google.dev/gemini-api/docs/api-key>`_ to use for
-         authentication. Applies to the Gemini Developer API only.
-       credentials (google.auth.credentials.Credentials): The credentials to use
-         for authentication when calling the Vertex AI APIs. Credentials can be
-         obtained from environment variables and default credentials. For more
-         information, see `Set up Application Default Credentials
-         <https://cloud.google.com/docs/authentication/provide-credentials-adc>`_.
-         Applies to the Vertex AI API only.
-       project (str): The `Google Cloud project ID
-         <https://cloud.google.com/vertex-ai/docs/start/cloud-environment>`_ to
-         use for quota. Can be obtained from environment variables (for example,
-         ``GOOGLE_CLOUD_PROJECT``). Applies to the Vertex AI API only.
-       location (str): The `location
-         <https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations>`_
-         to send API requests to (for example, ``us-central1``). Can be obtained
-         from environment variables. Applies to the Vertex AI API only.
-       debug_config (DebugConfig): Config settings that control network behavior
-         of the client. This is typically used when running test code.
-       http_options (Union[HttpOptions, HttpOptionsDict]): Http options to use
-         for the client.
+      client = genai.Client(
+          vertexai=True, project='my-project-id', location='us-central1'
+      )
     """
 
-    self._debug_config = debug_config or DebugConfig()
+    def __init__(
+        self,
+        *,
+        vertexai: Optional[bool] = None,
+        api_key: Optional[str] = None,
+        credentials: Optional[google.auth.credentials.Credentials] = None,
+        project: Optional[str] = None,
+        location: Optional[str] = None,
+        debug_config: Optional[DebugConfig] = None,
+        http_options: Optional[Union[HttpOptions, HttpOptionsDict]] = None,
+    ):
+        """Initializes the client.
 
-    self._api_client = self._get_api_client(
-        vertexai=vertexai,
-        api_key=api_key,
-        credentials=credentials,
-        project=project,
-        location=location,
-        debug_config=self._debug_config,
-        http_options=http_options,
-    )
+        Args:
+           vertexai (bool): Indicates whether the client should use the Vertex AI
+             API endpoints. Defaults to False (uses Gemini Developer API endpoints).
+             Applies to the Vertex AI API only.
+           api_key (str): The `API key
+             <https://ai.google.dev/gemini-api/docs/api-key>`_ to use for
+             authentication. Applies to the Gemini Developer API only.
+           credentials (google.auth.credentials.Credentials): The credentials to use
+             for authentication when calling the Vertex AI APIs. Credentials can be
+             obtained from environment variables and default credentials. For more
+             information, see `Set up Application Default Credentials
+             <https://cloud.google.com/docs/authentication/provide-credentials-adc>`_.
+             Applies to the Vertex AI API only.
+           project (str): The `Google Cloud project ID
+             <https://cloud.google.com/vertex-ai/docs/start/cloud-environment>`_ to
+             use for quota. Can be obtained from environment variables (for example,
+             ``GOOGLE_CLOUD_PROJECT``). Applies to the Vertex AI API only.
+           location (str): The `location
+             <https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations>`_
+             to send API requests to (for example, ``us-central1``). Can be obtained
+             from environment variables. Applies to the Vertex AI API only.
+           debug_config (DebugConfig): Config settings that control network behavior
+             of the client. This is typically used when running test code.
+           http_options (Union[HttpOptions, HttpOptionsDict]): Http options to use
+             for the client.
+        """
 
-    self._aio = AsyncClient(self._api_client)
-    self._models = Models(self._api_client)
-    self._tunings = Tunings(self._api_client)
-    self._caches = Caches(self._api_client)
-    self._batches = Batches(self._api_client)
-    self._files = Files(self._api_client)
-    self._operations = Operations(self._api_client)
+        self._debug_config = debug_config or DebugConfig()
 
-  @staticmethod
-  def _get_api_client(
-      vertexai: Optional[bool] = None,
-      api_key: Optional[str] = None,
-      credentials: Optional[google.auth.credentials.Credentials] = None,
-      project: Optional[str] = None,
-      location: Optional[str] = None,
-      debug_config: Optional[DebugConfig] = None,
-      http_options: Optional[HttpOptions] = None,
-  ):
-    if debug_config and debug_config.client_mode in [
-        'record',
-        'replay',
-        'auto',
-    ]:
-      return ReplayApiClient(
-          mode=debug_config.client_mode,
-          replay_id=debug_config.replay_id,
-          replays_directory=debug_config.replays_directory,
-          vertexai=vertexai,
-          api_key=api_key,
-          credentials=credentials,
-          project=project,
-          location=location,
-          http_options=http_options,
-      )
+        self._api_client = self._get_api_client(
+            vertexai=vertexai,
+            api_key=api_key,
+            credentials=credentials,
+            project=project,
+            location=location,
+            debug_config=self._debug_config,
+            http_options=http_options,
+        )
 
-    return ApiClient(
-        vertexai=vertexai,
-        api_key=api_key,
-        credentials=credentials,
-        project=project,
-        location=location,
-        http_options=http_options,
-    )
+        self._aio = AsyncClient(self._api_client)
+        self._models = Models(self._api_client)
+        self._tunings = Tunings(self._api_client)
+        self._caches = Caches(self._api_client)
+        self._batches = Batches(self._api_client)
+        self._files = Files(self._api_client)
+        self._operations = Operations(self._api_client)
 
-  @property
-  def chats(self) -> Chats:
-    return Chats(modules=self.models)
+    @staticmethod
+    def _get_api_client(
+        vertexai: Optional[bool] = None,
+        api_key: Optional[str] = None,
+        credentials: Optional[google.auth.credentials.Credentials] = None,
+        project: Optional[str] = None,
+        location: Optional[str] = None,
+        debug_config: Optional[DebugConfig] = None,
+        http_options: Optional[HttpOptions] = None,
+    ):
+        if debug_config and debug_config.client_mode in [
+            "record",
+            "replay",
+            "auto",
+        ]:
+            return ReplayApiClient(
+                mode=debug_config.client_mode,
+                replay_id=debug_config.replay_id,
+                replays_directory=debug_config.replays_directory,
+                vertexai=vertexai,
+                api_key=api_key,
+                credentials=credentials,
+                project=project,
+                location=location,
+                http_options=http_options,
+            )
 
-  @property
-  def aio(self) -> AsyncClient:
-    return self._aio
+        return ApiClient(
+            vertexai=vertexai,
+            api_key=api_key,
+            credentials=credentials,
+            project=project,
+            location=location,
+            http_options=http_options,
+        )
 
-  @property
-  def models(self) -> Models:
-    return self._models
+    @property
+    def chats(self) -> Chats:
+        return Chats(modules=self.models)
 
-  @property
-  def tunings(self) -> Tunings:
-    return self._tunings
+    @property
+    def aio(self) -> AsyncClient:
+        return self._aio
 
-  @property
-  def caches(self) -> Caches:
-    return self._caches
+    @property
+    def models(self) -> Models:
+        return self._models
 
-  @property
-  def batches(self) -> Batches:
-    return self._batches
+    @property
+    def tunings(self) -> Tunings:
+        return self._tunings
 
-  @property
-  def files(self) -> Files:
-    return self._files
+    @property
+    def caches(self) -> Caches:
+        return self._caches
 
-  @property
-  def operations(self) -> Operations:
-    return self._operations
+    @property
+    def batches(self) -> Batches:
+        return self._batches
 
-  @property
-  def vertexai(self) -> bool:
-    """Returns whether the client is using the Vertex AI API."""
-    return self._api_client.vertexai or False
+    @property
+    def files(self) -> Files:
+        return self._files
+
+    @property
+    def operations(self) -> Operations:
+        return self._operations
+
+    @property
+    def vertexai(self) -> bool:
+        """Returns whether the client is using the Vertex AI API."""
+        return self._api_client.vertexai or False

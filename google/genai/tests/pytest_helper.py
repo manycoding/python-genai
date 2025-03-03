@@ -18,25 +18,25 @@ import contextlib
 import json
 import os
 import pathlib
-from typing import Any, Optional
-from pydantic import BaseModel, Field, SerializeAsAny
+from typing import Any, Dict, Optional
+
 import pytest
-from .. import _common
-from .. import _replay_api_client
-from .. import types
+from pydantic import BaseModel, Field, SerializeAsAny
+
+from .. import _common, _replay_api_client, types
 from .._api_client import HttpOptions
 
 is_api_mode = "config.getoption('--mode') == 'api'"
 
 
 class TestTableItem(types.TestTableItem):
-  # This is not a test suite class.
-  __test__ = False
+    # This is not a test suite class.
+    __test__ = False
 
-  # Overrides to support Pydantic models.
-  parameters: SerializeAsAny[BaseModel] = Field(
-      description="""The parameters to the test. Use pydantic models.""",
-  )
+    # Overrides to support Pydantic models.
+    parameters: SerializeAsAny[BaseModel] = Field(
+        description="""The parameters to the test. Use pydantic models.""",
+    )
 
 
 def base_test_function(
@@ -46,52 +46,50 @@ def base_test_function(
     test_method: str,
     test_table_item: TestTableItem,
 ):
-  replay_id = (
-      test_table_item.override_replay_id
-      if test_table_item.override_replay_id
-      else test_table_item.name
-  )
-  api_type = 'vertex' if use_vertex else 'mldev'
-  replay_id = f'{replays_prefix}/{replay_id}.{api_type}'
-  client._api_client.initialize_replay_session(replay_id)
-  # vars().copy() provides a shallow copy of the parameters.
-  parameters_dict = vars(test_table_item.parameters).copy()
-  method_name_parts = test_method.split('.')
-  module = getattr(client, method_name_parts[0])
-  method = getattr(module, method_name_parts[1])
-  try:
-    method(**parameters_dict)
-    # Should not reach here if expecting an exception.
-    if test_table_item.exception_if_mldev and not client._api_client.vertexai:
-      assert False, 'Should have raised exception in MLDev.'
-    elif test_table_item.exception_if_vertex and client._api_client.vertexai:
-      assert False, 'Should have raised exception in Vertex.'
-    client._api_client.close()
-  except Exception as e:
-    if test_table_item.exception_if_mldev and not client._api_client.vertexai:
-      assert test_table_item.exception_if_mldev in str(e), str(e)
-    elif test_table_item.exception_if_vertex and client._api_client.vertexai:
-      assert test_table_item.exception_if_vertex in str(e), str(e)
-    else:
-      raise e
+    replay_id = (
+        test_table_item.override_replay_id
+        if test_table_item.override_replay_id
+        else test_table_item.name
+    )
+    api_type = "vertex" if use_vertex else "mldev"
+    replay_id = f"{replays_prefix}/{replay_id}.{api_type}"
+    client._api_client.initialize_replay_session(replay_id)
+    # vars().copy() provides a shallow copy of the parameters.
+    parameters_dict = vars(test_table_item.parameters).copy()
+    method_name_parts = test_method.split(".")
+    module = getattr(client, method_name_parts[0])
+    method = getattr(module, method_name_parts[1])
+    try:
+        method(**parameters_dict)
+        # Should not reach here if expecting an exception.
+        if test_table_item.exception_if_mldev and not client._api_client.vertexai:
+            assert False, "Should have raised exception in MLDev."
+        elif test_table_item.exception_if_vertex and client._api_client.vertexai:
+            assert False, "Should have raised exception in Vertex."
+        client._api_client.close()
+    except Exception as e:
+        if test_table_item.exception_if_mldev and not client._api_client.vertexai:
+            assert test_table_item.exception_if_mldev in str(e), str(e)
+        elif test_table_item.exception_if_vertex and client._api_client.vertexai:
+            assert test_table_item.exception_if_vertex in str(e), str(e)
+        else:
+            raise e
 
 
-def create_test_for_table_item(
-    test_method: str, test_table_item: TestTableItem
-):
-  return lambda client, use_vertex, replays_prefix: base_test_function(
-      client, use_vertex, replays_prefix, test_method, test_table_item
-  )
+def create_test_for_table_item(test_method: str, test_table_item: TestTableItem):
+    return lambda client, use_vertex, replays_prefix: base_test_function(
+        client, use_vertex, replays_prefix, test_method, test_table_item
+    )
 
 
 def create_test_for_table(
-    globals_for_file: dict[str, Any],
+    globals_for_file: Dict[str, Any],
     test_method: str,
-    test_table: list[TestTableItem],
+    test_table: List[TestTableItem],
 ):
-  for test_table_item in test_table:
-    if test_table_item.has_union:
-      assert test_table_item.name.startswith('test_union_'), f"""
+    for test_table_item in test_table:
+        if test_table_item.has_union:
+            assert test_table_item.name.startswith("test_union_"), f"""
       test: {test_table_item.name}
       When has_union is true, it must be a test that explicitly test the
       non-canonical type in the union.
@@ -100,9 +98,9 @@ def create_test_for_table(
       If this test is truly about testing the non-canonical type of the union,
       rename the test to start with 'test_union_'. E.g.
       test_union_contents_is_string()"""
-    globals_for_file[test_table_item.name] = create_test_for_table_item(
-        test_method, test_table_item
-    )
+        globals_for_file[test_table_item.name] = create_test_for_table_item(
+            test_method, test_table_item
+        )
 
 
 # Sets up the test framework.
@@ -115,76 +113,72 @@ def create_test_for_table(
 def setup(
     *,
     file: str,
-    globals_for_file: Optional[dict[str, Any]] = None,
+    globals_for_file: Optional[Dict[str, Any]] = None,
     test_method: Optional[str] = None,
-    test_table: Optional[list[TestTableItem]] = None,
+    test_table: Optional[List[TestTableItem]] = None,
     http_options: Optional[HttpOptions] = None,
 ):
-  """Generates parameterization for tests, run for both Vertex and MLDev."""
-  replays_directory = (
-      file.replace(os.path.dirname(__file__), 'tests')
-      .replace('.py', '')
-      .replace('/test_', '/')
-  )
-
-  is_tap_mode = False
-  if os.environ.get('UNITTEST_ON_FORGE', None) is not None:
-    is_tap_mode = True
-
-  if test_table:
-    create_test_for_table(globals_for_file, test_method, test_table)
-
-  if test_table and not is_tap_mode:
-    replays_root_directory = os.environ.get(
-        'GOOGLE_GENAI_REPLAYS_DIRECTORY', None
-    )
-    if replays_root_directory is None:
-      raise ValueError(
-          'GOOGLE_GENAI_REPLAYS_DIRECTORY environment variable is not set'
-      )
-    abs_replay_directory = os.path.join(
-        replays_root_directory, replays_directory
-    )
-    test_table_file_path = os.path.join(
-        abs_replay_directory, '_test_table.json'
+    """Generates parameterization for tests, run for both Vertex and MLDev."""
+    replays_directory = (
+        file.replace(os.path.dirname(__file__), "tests")
+        .replace(".py", "")
+        .replace("/test_", "/")
     )
 
-    pathlib.Path(abs_replay_directory).mkdir(parents=True, exist_ok=True)
-    assert isinstance(
-        test_table[0].parameters, BaseModel
-    ), f'{test_table_file_path} parameters must be a BaseModel.'
-    test_table_file = types.TestTableFile(
-        comment='Auto-generated. Do not edit.',
-        test_method=test_method,
-        parameter_names=list(test_table[0].parameters.model_fields.keys()),
-        test_table=test_table,
+    is_tap_mode = False
+    if os.environ.get("UNITTEST_ON_FORGE", None) is not None:
+        is_tap_mode = True
+
+    if test_table:
+        create_test_for_table(globals_for_file, test_method, test_table)
+
+    if test_table and not is_tap_mode:
+        replays_root_directory = os.environ.get("GOOGLE_GENAI_REPLAYS_DIRECTORY", None)
+        if replays_root_directory is None:
+            raise ValueError(
+                "GOOGLE_GENAI_REPLAYS_DIRECTORY environment variable is not set"
+            )
+        abs_replay_directory = os.path.join(replays_root_directory, replays_directory)
+        test_table_file_path = os.path.join(abs_replay_directory, "_test_table.json")
+
+        pathlib.Path(abs_replay_directory).mkdir(parents=True, exist_ok=True)
+        assert isinstance(test_table[0].parameters, BaseModel), (
+            f"{test_table_file_path} parameters must be a BaseModel."
+        )
+        test_table_file = types.TestTableFile(
+            comment="Auto-generated. Do not edit.",
+            test_method=test_method,
+            parameter_names=list(test_table[0].parameters.model_fields.keys()),
+            test_table=test_table,
+        )
+        os.makedirs(os.path.dirname(test_table_file_path), exist_ok=True)
+
+        with open(test_table_file_path, "w") as f:
+            f.write(
+                test_table_file.model_dump_json(
+                    exclude_none=True, exclude_unset=True, by_alias=True, indent=2
+                ),
+            )
+
+    # Add fixture for requested client option.
+    return pytest.mark.parametrize(
+        "use_vertex, replays_prefix, http_options",
+        [
+            (True, replays_directory, http_options),
+            (False, replays_directory, http_options),
+        ],
     )
-    os.makedirs(os.path.dirname(test_table_file_path), exist_ok=True)
-
-    with open(test_table_file_path, 'w') as f:
-      f.write(
-          test_table_file.model_dump_json(exclude_none=True, exclude_unset=True, by_alias=True, indent=2),
-      )
-
-  # Add fixture for requested client option.
-  return pytest.mark.parametrize(
-      'use_vertex, replays_prefix, http_options',
-      [
-          (True, replays_directory, http_options),
-          (False, replays_directory, http_options),
-      ],
-  )
 
 
 def exception_if_mldev(client, exception_type: type[Exception]):
-  if client._api_client.vertexai:
-    return contextlib.nullcontext()
-  else:
-    return pytest.raises(exception_type)
+    if client._api_client.vertexai:
+        return contextlib.nullcontext()
+    else:
+        return pytest.raises(exception_type)
 
 
 def exception_if_vertex(client, exception_type: type[Exception]):
-  if client._api_client.vertexai:
-    return pytest.raises(exception_type)
-  else:
-    return contextlib.nullcontext()
+    if client._api_client.vertexai:
+        return pytest.raises(exception_type)
+    else:
+        return contextlib.nullcontext()

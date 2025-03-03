@@ -16,60 +16,60 @@
 
 """Test files upload method."""
 
-
 import pathlib
+
 import pytest
+
 from ... import _transformers as t
 from ... import types
 from .. import pytest_helper
 
-
-test_table: list[pytest_helper.TestTableItem] = []
+test_table: List[pytest_helper.TestTableItem] = []
 
 pytestmark = pytest_helper.setup(
     file=__file__,
     globals_for_file=globals(),
-    test_method='t.t_file_name',
+    test_method="t.t_file_name",
     test_table=test_table,
 )
 
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 def test_name_transform_name(client):
-  with pytest_helper.exception_if_vertex(client, ValueError):
-    for file in client.files.list():
-      if file.download_uri is not None:
-        break
-    else:
-      raise ValueError('No files found with a `download_uri`.')
+    with pytest_helper.exception_if_vertex(client, ValueError):
+        for file in client.files.list():
+            if file.download_uri is not None:
+                break
+        else:
+            raise ValueError("No files found with a `download_uri`.")
 
-    file_id = file.name.split('/')[-1]
-    for f in [file, file_id, file.name, file.uri, file.download_uri]:
-      name = t.t_file_name(client, f)
-      assert name == file_id
+        file_id = file.name.split("/")[-1]
+        for f in [file, file_id, file.name, file.uri, file.download_uri]:
+            name = t.t_file_name(client, f)
+            assert name == file_id
 
 
 def test_basic_download(client):
-  with pytest_helper.exception_if_vertex(client, ValueError):
-    for file in client.files.list():
-      if file.download_uri is not None:
-        break
-    else:
-      raise ValueError('No files found with a `download_uri`.')
+    with pytest_helper.exception_if_vertex(client, ValueError):
+        for file in client.files.list():
+            if file.download_uri is not None:
+                break
+        else:
+            raise ValueError("No files found with a `download_uri`.")
 
-    content = client.files.download(file=file)
-    assert content[4:8] == b'ftyp'
+        content = client.files.download(file=file)
+        assert content[4:8] == b"ftyp"
 
 
 @pytest.mark.asyncio
 async def test_basic_download_async(client):
-  with pytest_helper.exception_if_vertex(client, ValueError):
-    async for file in await client.aio.files.list():
-      if file.download_uri is not None:
-        break
-    else:
-      raise ValueError('No files found with a `download_uri`.')
+    with pytest_helper.exception_if_vertex(client, ValueError):
+        async for file in await client.aio.files.list():
+            if file.download_uri is not None:
+                break
+        else:
+            raise ValueError("No files found with a `download_uri`.")
 
-    content = await client.aio.files.download(file=file)
-    assert content[4:8] == b'ftyp'
+        content = await client.aio.files.download(file=file)
+        assert content[4:8] == b"ftyp"

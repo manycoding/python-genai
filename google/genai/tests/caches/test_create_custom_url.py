@@ -15,61 +15,63 @@
 
 
 import copy
+
 import pytest
+
+from ... import _transformers as t
 from ... import types
 from .. import pytest_helper
 from . import constants
-from ... import _transformers as t
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI = types._CreateCachedContentParameters(
-    model='gemini-1.5-pro-002',
+    model="gemini-1.5-pro-002",
     config={
-        'contents': [
+        "contents": [
             types.Content(
-                role='user',
+                role="user",
                 parts=[
                     types.Part(
                         fileData=types.FileData(
-                            fileUri='gs://cloud-samples-data/generative-ai/pdf/2312.11805v3.pdf',
-                            mimeType='application/pdf',
+                            fileUri="gs://cloud-samples-data/generative-ai/pdf/2312.11805v3.pdf",
+                            mimeType="application/pdf",
                         )
                     ),
                     types.Part(
                         fileData=types.FileData(
-                            fileUri='gs://cloud-samples-data/generative-ai/pdf/2403.05530.pdf',
-                            mimeType='application/pdf',
+                            fileUri="gs://cloud-samples-data/generative-ai/pdf/2403.05530.pdf",
+                            mimeType="application/pdf",
                         )
                     ),
                 ],
             )
         ],
-        'system_instruction': t.t_content(None, 'What is the sum of the two pdfs?'),
-        'display_name': 'test cache',
-        'ttl': '86400s',
-        'http_options': constants.VERTEX_HTTP_OPTIONS,
+        "system_instruction": t.t_content(None, "What is the sum of the two pdfs?"),
+        "display_name": "test cache",
+        "ttl": "86400s",
+        "http_options": constants.VERTEX_HTTP_OPTIONS,
     },
 )
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE = types._CreateCachedContentParameters(
-    model='gemini-1.5-pro-001',
+    model="gemini-1.5-pro-001",
     config={
-        'contents': [
+        "contents": [
             types.Content(
-                role='user',
+                role="user",
                 parts=[
                     types.Part(
                         fileData=types.FileData(
-                            mimeType='video/mp4',
-                            fileUri='https://generativelanguage.googleapis.com/v1beta/files/v200dhvn15h7',
+                            mimeType="video/mp4",
+                            fileUri="https://generativelanguage.googleapis.com/v1beta/files/v200dhvn15h7",
                         )
                     )
                 ],
             )
         ],
-        'system_instruction': t.t_content(None, 'What is the sum of the two pdfs?'),
-        'display_name': 'test cache',
-        'ttl': '86400s',
-        'http_options': constants.MLDEV_HTTP_OPTIONS,
+        "system_instruction": t.t_content(None, "What is the sum of the two pdfs?"),
+        "display_name": "test cache",
+        "ttl": "86400s",
+        "http_options": constants.MLDEV_HTTP_OPTIONS,
     },
 )
 
@@ -83,23 +85,23 @@ _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE = types._CreateCachedContentPara
 # 2. Find the resource name in debugging print and change the resource name constants.py.
 # 3. Run and record get and update tests.
 #   sh run_tests.sh pytest -s tests/caches/test_get.py --mode=api && sh run_tests.sh pytest -s tests/caches/test_update.py --mode=api && sh run_tests.sh pytest -s tests/caches/test_delete.py --mode=api
-test_table: list[pytest_helper.TestTableItem] = [
+test_table: List[pytest_helper.TestTableItem] = [
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_gcs_uri',
-        exception_if_mldev='404',
+        name="test_caches_create_with_gcs_uri",
+        exception_if_mldev="404",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI,
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_googleai_file',
-        exception_if_vertex='404',
+        name="test_caches_create_with_googleai_file",
+        exception_if_vertex="404",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE,
-        skip_in_api_mode='Create is not reproducible in the API mode.',
+        skip_in_api_mode="Create is not reproducible in the API mode.",
     ),
 ]
 pytestmark = pytest_helper.setup(
     file=__file__,
     globals_for_file=globals(),
-    test_method='caches.create',
+    test_method="caches.create",
     test_table=test_table,
 )
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)

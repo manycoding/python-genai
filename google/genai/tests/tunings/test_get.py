@@ -17,7 +17,7 @@
 from ... import types as genai_types
 from .. import pytest_helper
 
-test_table: list[pytest_helper.TestTableItem] = [
+test_table: List[pytest_helper.TestTableItem] = [
     pytest_helper.TestTableItem(
         name="test_vertexai",
         parameters=genai_types._GetTuningJobParameters(
@@ -45,14 +45,14 @@ pytest_plugins = ("pytest_asyncio",)
 
 
 def test_helper_properties(client):
-  if client._api_client.vertexai:
-    job = client.tunings.get(
-        name="projects/801452371447/locations/us-central1/tuningJobs/5608183405364641792"
-    )
-  else:
-    job = client.tunings.get(
-        name="tunedModels/testdatasetexamples-model-j0fpgpaksvri"
-    )
+    if client._api_client.vertexai:
+        job = client.tunings.get(
+            name="projects/801452371447/locations/us-central1/tuningJobs/5608183405364641792"
+        )
+    else:
+        job = client.tunings.get(
+            name="tunedModels/testdatasetexamples-model-j0fpgpaksvri"
+        )
 
-  assert job.has_ended
-  assert job.has_succeeded
+    assert job.has_ended
+    assert job.has_succeeded

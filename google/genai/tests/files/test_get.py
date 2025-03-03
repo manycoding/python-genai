@@ -17,26 +17,27 @@
 """Test files get method."""
 
 import pytest
+
 from ... import types
 from .. import pytest_helper
 
-test_table: list[pytest_helper.TestTableItem] = [
+test_table: List[pytest_helper.TestTableItem] = [
     pytest_helper.TestTableItem(
-        name='test_get',
-        parameters=types._GetFileParameters(name='files/vjvu9fwk2qj8'),
-        exception_if_vertex='only supported in the default client',
+        name="test_get",
+        parameters=types._GetFileParameters(name="files/vjvu9fwk2qj8"),
+        exception_if_vertex="only supported in the default client",
     ),
 ]
 
 pytestmark = pytest_helper.setup(
     file=__file__,
     globals_for_file=globals(),
-    test_method='files.get',
+    test_method="files.get",
     test_table=test_table,
 )
 
 
 @pytest.mark.asyncio
 async def test_async(client):
-  with pytest_helper.exception_if_vertex(client, ValueError):
-    file = await client.aio.files.get(name='files/vjvu9fwk2qj8')
+    with pytest_helper.exception_if_vertex(client, ValueError):
+        file = await client.aio.files.get(name="files/vjvu9fwk2qj8")

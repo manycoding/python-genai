@@ -21,53 +21,51 @@ import pytest
 from ... import types
 from .. import pytest_helper
 
-
-_BATCH_JOB_NAME = '7085929781874655232'
+_BATCH_JOB_NAME = "7085929781874655232"
 _BATCH_JOB_FULL_RESOURCE_NAME = (
-    'projects/964831358985/locations/us-central1/'
-    f'batchPredictionJobs/{_BATCH_JOB_NAME}'
+    f"projects/964831358985/locations/us-central1/batchPredictionJobs/{_BATCH_JOB_NAME}"
 )
-_INVALID_BATCH_JOB_NAME = 'invalid_name'
+_INVALID_BATCH_JOB_NAME = "invalid_name"
 
 
 # All tests will be run for both Vertex and MLDev.
-test_table: list[pytest_helper.TestTableItem] = [
+test_table: List[pytest_helper.TestTableItem] = [
     pytest_helper.TestTableItem(
-        name='test_delete_batch_job',
+        name="test_delete_batch_job",
         parameters=types._DeleteBatchJobParameters(
             name=_BATCH_JOB_NAME,
         ),
-        exception_if_mldev='only supported in the Vertex AI client',
+        exception_if_mldev="only supported in the Vertex AI client",
     ),
     pytest_helper.TestTableItem(
-        name='test_delete_batch_job_full_resource_name',
-        override_replay_id='test_delete_batch_job',
+        name="test_delete_batch_job_full_resource_name",
+        override_replay_id="test_delete_batch_job",
         parameters=types._DeleteBatchJobParameters(
             name=_BATCH_JOB_FULL_RESOURCE_NAME,
         ),
-        exception_if_mldev='only supported in the Vertex AI client',
+        exception_if_mldev="only supported in the Vertex AI client",
     ),
     pytest_helper.TestTableItem(
-        name='test_delete_batch_job_with_invalid_name',
+        name="test_delete_batch_job_with_invalid_name",
         parameters=types._DeleteBatchJobParameters(
             name=_INVALID_BATCH_JOB_NAME,
         ),
-        exception_if_mldev='only supported in the Vertex AI client',
-        exception_if_vertex='Invalid batch job name',
+        exception_if_mldev="only supported in the Vertex AI client",
+        exception_if_vertex="Invalid batch job name",
     ),
 ]
 
 pytestmark = pytest_helper.setup(
     file=__file__,
     globals_for_file=globals(),
-    test_method='batches.delete',
+    test_method="batches.delete",
     test_table=test_table,
 )
 
 
 @pytest.mark.asyncio
 async def test_async_delete(client):
-  with pytest_helper.exception_if_mldev(client, ValueError):
-    delete_job = await client.aio.batches.delete(name=_BATCH_JOB_NAME)
+    with pytest_helper.exception_if_mldev(client, ValueError):
+        delete_job = await client.aio.batches.delete(name=_BATCH_JOB_NAME)
 
-    assert delete_job
+        assert delete_job

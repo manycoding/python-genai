@@ -14,62 +14,63 @@
 #
 
 
-from copy import deepcopy
 import datetime
-import pytest
 import sys
+from copy import deepcopy
+
+import pytest
+
+from ... import _transformers as t
 from ... import types
 from .. import pytest_helper
-from ... import _transformers as t
-
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI = types._CreateCachedContentParameters(
-    model='gemini-1.5-pro-002',
+    model="gemini-1.5-pro-002",
     config={
-        'contents': [
+        "contents": [
             types.Content(
-                role='user',
+                role="user",
                 parts=[
                     types.Part(
                         fileData=types.FileData(
-                            fileUri='gs://cloud-samples-data/generative-ai/pdf/2312.11805v3.pdf',
-                            mimeType='application/pdf',
+                            fileUri="gs://cloud-samples-data/generative-ai/pdf/2312.11805v3.pdf",
+                            mimeType="application/pdf",
                         )
                     ),
                     types.Part(
                         fileData=types.FileData(
-                            fileUri='gs://cloud-samples-data/generative-ai/pdf/2403.05530.pdf',
-                            mimeType='application/pdf',
+                            fileUri="gs://cloud-samples-data/generative-ai/pdf/2403.05530.pdf",
+                            mimeType="application/pdf",
                         )
                     ),
                 ],
             )
         ],
-        'system_instruction': t.t_content(None, 'What is the sum of the two pdfs?'),
-        'display_name': 'test cache',
-        'ttl': '86400s',
+        "system_instruction": t.t_content(None, "What is the sum of the two pdfs?"),
+        "display_name": "test cache",
+        "ttl": "86400s",
     },
 )
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE = types._CreateCachedContentParameters(
-    model='gemini-1.5-pro-001',
+    model="gemini-1.5-pro-001",
     config={
-        'contents': [
+        "contents": [
             types.Content(
-                role='user',
+                role="user",
                 parts=[
                     types.Part(
                         fileData=types.FileData(
-                            mimeType='video/mp4',
-                            fileUri='https://generativelanguage.googleapis.com/v1beta/files/v200dhvn15h7',
+                            mimeType="video/mp4",
+                            fileUri="https://generativelanguage.googleapis.com/v1beta/files/v200dhvn15h7",
                         )
                     )
                 ],
             )
         ],
-        'system_instruction': t.t_content(None, 'What is the sum of the two pdfs?'),
-        'display_name': 'test cache',
-        'ttl': '86400s',
+        "system_instruction": t.t_content(None, "What is the sum of the two pdfs?"),
+        "display_name": "test cache",
+        "ttl": "86400s",
     },
 )
 
@@ -77,37 +78,33 @@ _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_1 = deepcopy(
     _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_1.model = (
-    'models/gemini-1.5-pro-002'
+    "models/gemini-1.5-pro-002"
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_2 = deepcopy(
     _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_2.model = (
-    'publishers/google/models/gemini-1.5-pro-002'
+    "publishers/google/models/gemini-1.5-pro-002"
 )
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_PARTIAL_MODEL_1 = deepcopy(
     _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_PARTIAL_MODEL_1.model = (
-    'models/gemini-1.5-pro-001'
+    "models/gemini-1.5-pro-001"
 )
 
 if sys.version_info >= (3, 11):
-  _EXPIRE_TIME = datetime.datetime.fromisoformat('2024-12-20T00:00:00Z')
+    _EXPIRE_TIME = datetime.datetime.fromisoformat("2024-12-20T00:00:00Z")
 else:
-  _EXPIRE_TIME = datetime.datetime.fromisoformat('2024-12-20T00:00:00+00:00')
+    _EXPIRE_TIME = datetime.datetime.fromisoformat("2024-12-20T00:00:00+00:00")
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME = deepcopy(
     _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME.config.ttl = None
-_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME.config.expire_time = (
-    _EXPIRE_TIME
-)
-_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME.config.display_name = (
-    'test cache'
-)
+_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME.config.expire_time = _EXPIRE_TIME
+_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME.config.display_name = "test cache"
 
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_EXPIRE_TIME = deepcopy(
     _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE
@@ -117,7 +114,7 @@ _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_EXPIRE_TIME.config.expire_time =
     _EXPIRE_TIME
 )
 _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_EXPIRE_TIME.config.display_name = (
-    'test cache'
+    "test cache"
 )
 
 
@@ -131,67 +128,67 @@ _CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_EXPIRE_TIME.config.display_name 
 # 2. Find the resource name in debugging print and change the resource name constants.py.
 # 3. Run and record get and update tests.
 #   sh run_tests.sh pytest -s tests/caches/test_get.py --mode=api && sh run_tests.sh pytest -s tests/caches/test_update.py --mode=api && sh run_tests.sh pytest -s tests/caches/test_delete.py --mode=api
-test_table: list[pytest_helper.TestTableItem] = [
+test_table: List[pytest_helper.TestTableItem] = [
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_gcs_uri',
-        exception_if_mldev='INVALID_ARGUMENT',
+        name="test_caches_create_with_gcs_uri",
+        exception_if_mldev="INVALID_ARGUMENT",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI,
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_gcs_uri_expire_time',
-        exception_if_mldev='INVALID_ARGUMENT',
+        name="test_caches_create_with_gcs_uri_expire_time",
+        exception_if_mldev="INVALID_ARGUMENT",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_EXPIRE_TIME,
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_model_partial_path_1',
-        exception_if_mldev='INVALID_ARGUMENT',
+        name="test_caches_create_model_partial_path_1",
+        exception_if_mldev="INVALID_ARGUMENT",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_1,
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_model_partial_path_2',
-        exception_if_mldev='404',
+        name="test_caches_create_model_partial_path_2",
+        exception_if_mldev="404",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GCS_URI_PARTIAL_MODEL_2,
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_googleai_file',
-        exception_if_vertex='Internal',
+        name="test_caches_create_with_googleai_file",
+        exception_if_vertex="Internal",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE,
-        skip_in_api_mode='Create is not reproducible in the API mode.',
+        skip_in_api_mode="Create is not reproducible in the API mode.",
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_googleai_file_expire_time',
-        exception_if_vertex='Internal',
+        name="test_caches_create_with_googleai_file_expire_time",
+        exception_if_vertex="Internal",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_EXPIRE_TIME,
-        skip_in_api_mode='Create is not reproducible in the API mode.',
+        skip_in_api_mode="Create is not reproducible in the API mode.",
     ),
     pytest_helper.TestTableItem(
-        name='test_caches_create_with_googleai_file_model_partial_path_1',
-        exception_if_vertex='Internal',
+        name="test_caches_create_with_googleai_file_model_partial_path_1",
+        exception_if_vertex="Internal",
         parameters=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE_PARTIAL_MODEL_1,
-        skip_in_api_mode='Create is not reproducible in the API mode.',
+        skip_in_api_mode="Create is not reproducible in the API mode.",
     ),
 ]
 pytestmark = [
     pytest_helper.setup(
         file=__file__,
         globals_for_file=globals(),
-        test_method='caches.create',
+        test_method="caches.create",
         test_table=test_table,
     ),
 ]
-pytest_plugins = ('pytest_asyncio',)
+pytest_plugins = ("pytest_asyncio",)
 
 
 @pytest.mark.asyncio
 async def test_async_googleai_file_create(client):
-  if client._api_client.vertexai:
-    with pytest.raises(Exception):
-      await client.aio.caches.create(
-          model=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.model,
-          config=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.config,
-      )
-  else:
-    await client.aio.caches.create(
-        model=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.model,
-        config=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.config,
-    )
+    if client._api_client.vertexai:
+        with pytest.raises(Exception):
+            await client.aio.caches.create(
+                model=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.model,
+                config=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.config,
+            )
+    else:
+        await client.aio.caches.create(
+            model=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.model,
+            config=_CREATE_CACHED_CONTENT_PARAMETERS_GOOGLEAI_FILE.config,
+        )

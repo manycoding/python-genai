@@ -13,418 +13,424 @@
 # limitations under the License.
 #
 
-from typing import AsyncIterator, Awaitable, Optional
-from typing import Union
+from typing import AsyncIterator, Awaitable, Dict, List, Optional, Union
 
 from . import _transformers as t
 from .models import AsyncModels, Models
-from .types import Content, ContentDict, GenerateContentConfigOrDict, GenerateContentResponse, Part, PartUnionDict
+from .types import (
+    Content,
+    ContentDict,
+    GenerateContentConfigOrDict,
+    GenerateContentResponse,
+    Part,
+    PartUnionDict,
+)
 
 
 def _validate_content(content: Content) -> bool:
-  if not content.parts:
-    return False
-  for part in content.parts:
-    if part == Part():
-      return False
-    if part.text is not None and part.text == "":
-      return False
-  return True
+    if not content.parts:
+        return False
+    for part in content.parts:
+        if part == Part():
+            return False
+        if part.text is not None and part.text == "":
+            return False
+    return True
 
 
-def _validate_contents(contents: list[Content]) -> bool:
-  if not contents:
-    return False
-  for content in contents:
-    if not _validate_content(content):
-      return False
-  return True
+def _validate_contents(contents: List[Content]) -> bool:
+    if not contents:
+        return False
+    for content in contents:
+        if not _validate_content(content):
+            return False
+    return True
 
 
 def _validate_response(response: GenerateContentResponse) -> bool:
-  if not response.candidates:
-    return False
-  if not response.candidates[0].content:
-    return False
-  return _validate_content(response.candidates[0].content)
+    if not response.candidates:
+        return False
+    if not response.candidates[0].content:
+        return False
+    return _validate_content(response.candidates[0].content)
 
 
 def _extract_curated_history(
-    comprehensive_history: list[Content],
-) -> list[Content]:
-  """Extracts the curated (valid) history from a comprehensive history.
+    comprehensive_history: List[Content],
+) -> List[Content]:
+    """Extracts the curated (valid) history from a comprehensive history.
 
-  The comprehensive history contains all turns (user input and model responses),
-  including any invalid or rejected model outputs.  This function filters
-  that history to return only the valid turns.
+    The comprehensive history contains all turns (user input and model responses),
+    including any invalid or rejected model outputs.  This function filters
+    that history to return only the valid turns.
 
-  A "turn" starts with one user input (a single content) and then follows by
-  corresponding model response (which may consist of multiple contents).
-  Turns are assumed to alternate: user input, model output, user input, model
-  output, etc.
+    A "turn" starts with one user input (a single content) and then follows by
+    corresponding model response (which may consist of multiple contents).
+    Turns are assumed to alternate: user input, model output, user input, model
+    output, etc.
 
-  Args:
-      comprehensive_history: A list representing the complete chat history.
-        Including invalid turns.
+    Args:
+        comprehensive_history: A list representing the complete chat history.
+          Including invalid turns.
 
-  Returns:
-      curated history, which is a list of valid turns.
-  """
-  if not comprehensive_history:
-    return []
-  curated_history = []
-  length = len(comprehensive_history)
-  i = 0
-  current_input = comprehensive_history[i]
-  if current_input.role != "user":
-    raise ValueError("History must start with a user turn.")
-  while i < length:
-    if comprehensive_history[i].role not in ["user", "model"]:
-      raise ValueError(
-          "Role must be user or model, but got"
-          f" {comprehensive_history[i].role}"
-      )
+    Returns:
+        curated history, which is a list of valid turns.
+    """
+    if not comprehensive_history:
+        return []
+    curated_history = []
+    length = len(comprehensive_history)
+    i = 0
+    current_input = comprehensive_history[i]
+    if current_input.role != "user":
+        raise ValueError("History must start with a user turn.")
+    while i < length:
+        if comprehensive_history[i].role not in ["user", "model"]:
+            raise ValueError(
+                f"Role must be user or model, but got {comprehensive_history[i].role}"
+            )
 
-    if comprehensive_history[i].role == "user":
-      current_input = comprehensive_history[i]
-      i += 1
-    else:
-      current_output = []
-      is_valid = True
-      while i < length and comprehensive_history[i].role == "model":
-        current_output.append(comprehensive_history[i])
-        if is_valid and not _validate_content(comprehensive_history[i]):
-          is_valid = False
-        i += 1
-      if is_valid:
-        curated_history.append(current_input)
-        curated_history.extend(current_output)
-  return curated_history
+        if comprehensive_history[i].role == "user":
+            current_input = comprehensive_history[i]
+            i += 1
+        else:
+            current_output = []
+            is_valid = True
+            while i < length and comprehensive_history[i].role == "model":
+                current_output.append(comprehensive_history[i])
+                if is_valid and not _validate_content(comprehensive_history[i]):
+                    is_valid = False
+                i += 1
+            if is_valid:
+                curated_history.append(current_input)
+                curated_history.extend(current_output)
+    return curated_history
 
 
 class _BaseChat:
-  """Base chat session."""
+    """Base chat session."""
 
-  def __init__(
-      self,
-      *,
-      modules: Union[Models, AsyncModels],
-      model: str,
-      config: Optional[GenerateContentConfigOrDict] = None,
-      history: list[Content],
-  ):
-    self._modules = modules
-    self._model = model
-    self._config = config
-    self._comprehensive_history = history
-    """Comprehensive history is the full history of the chat, including turns of the invalid contents from the model and their associated inputs.
+    def __init__(
+        self,
+        *,
+        modules: Union[Models, AsyncModels],
+        model: str,
+        config: Optional[GenerateContentConfigOrDict] = None,
+        history: List[Content],
+    ):
+        self._modules = modules
+        self._model = model
+        self._config = config
+        self._comprehensive_history = history
+        """Comprehensive history is the full history of the chat, including turns of the invalid contents from the model and their associated inputs.
     """
-    self._curated_history = _extract_curated_history(history)
-    """Curated history is the set of valid turns that will be used in the subsequent send requests.
+        self._curated_history = _extract_curated_history(history)
+        """Curated history is the set of valid turns that will be used in the subsequent send requests.
     """
 
+    def record_history(
+        self,
+        user_input: Content,
+        model_output: List[Content],
+        automatic_function_calling_history: List[Content],
+        is_valid: bool,
+    ):
+        """Records the chat history.
 
-  def record_history(self, user_input: Content,
-                     model_output: list[Content],
-                     automatic_function_calling_history: list[Content],
-                     is_valid: bool):
-    """Records the chat history.
+        Maintaining both comprehensive and curated histories.
 
-    Maintaining both comprehensive and curated histories.
+        Args:
+          user_input: The user's input content.
+          model_output: A list of `Content` from the model's response.
+            This can be an empty list if the model produced no output.
+          automatic_function_calling_history: A list of `Content` representing
+            the history of automatic function calls, including the user input as
+            the first entry.
+          is_valid: A boolean flag indicating whether the current model output is
+            considered valid.
+        """
+        input_contents = (
+            automatic_function_calling_history
+            if automatic_function_calling_history
+            else [user_input]
+        )
+        # Appends an empty content when model returns empty response, so that the
+        # history is always alternating between user and model.
+        output_contents = (
+            model_output if model_output else [Content(role="model", parts=[])]
+        )
+        self._comprehensive_history.extend(input_contents)
+        self._comprehensive_history.extend(output_contents)
+        if is_valid:
+            self._curated_history.extend(input_contents)
+            self._curated_history.extend(output_contents)
 
-    Args:
-      user_input: The user's input content.
-      model_output: A list of `Content` from the model's response.
-        This can be an empty list if the model produced no output.
-      automatic_function_calling_history: A list of `Content` representing
-        the history of automatic function calls, including the user input as
-        the first entry.
-      is_valid: A boolean flag indicating whether the current model output is
-        considered valid.
-    """
-    input_contents = (
-        automatic_function_calling_history
-        if automatic_function_calling_history
-        else [user_input]
-    )
-    # Appends an empty content when model returns empty response, so that the
-    # history is always alternating between user and model.
-    output_contents = (
-        model_output if model_output else [Content(role="model", parts=[])]
-    )
-    self._comprehensive_history.extend(input_contents)
-    self._comprehensive_history.extend(output_contents)
-    if is_valid:
-      self._curated_history.extend(input_contents)
-      self._curated_history.extend(output_contents)
+    def get_history(self, curated: bool = False) -> List[Content]:
+        """Returns the chat history.
 
+        Args:
+            curated: A boolean flag indicating whether to return the curated
+                (valid) history or the comprehensive (all turns) history.
+                Defaults to False (returns the comprehensive history).
 
-  def get_history(self, curated: bool = False) -> list[Content]:
-    """Returns the chat history.
-
-    Args:
-        curated: A boolean flag indicating whether to return the curated
-            (valid) history or the comprehensive (all turns) history.
-            Defaults to False (returns the comprehensive history).
-
-    Returns:
-        A list of `Content` objects representing the chat history.
-    """
-    if curated:
-      return self._curated_history
-    else:
-      return self._comprehensive_history
+        Returns:
+            A list of `Content` objects representing the chat history.
+        """
+        if curated:
+            return self._curated_history
+        else:
+            return self._comprehensive_history
 
 
 class Chat(_BaseChat):
-  """Chat session."""
+    """Chat session."""
 
-  def send_message(
-      self,
-      message: Union[list[PartUnionDict], PartUnionDict],
-      config: Optional[GenerateContentConfigOrDict] = None,
-  ) -> GenerateContentResponse:
-    """Sends the conversation history with the additional message and returns the model's response.
+    def send_message(
+        self,
+        message: Union[List[PartUnionDict], PartUnionDict],
+        config: Optional[GenerateContentConfigOrDict] = None,
+    ) -> GenerateContentResponse:
+        """Sends the conversation history with the additional message and returns the model's response.
 
-    Args:
-      message: The message to send to the model.
-      config:  Optional config to override the default Chat config for this
-        request.
+        Args:
+          message: The message to send to the model.
+          config:  Optional config to override the default Chat config for this
+            request.
 
-    Returns:
-      The model's response.
+        Returns:
+          The model's response.
 
-    Usage:
+        Usage:
 
-    .. code-block:: python
+        .. code-block:: python
 
-      chat = client.chats.create(model='gemini-1.5-flash')
-      response = chat.send_message('tell me a story')
-    """
+          chat = client.chats.create(model='gemini-1.5-flash')
+          response = chat.send_message('tell me a story')
+        """
 
-    input_content = t.t_content(self._modules._api_client, message)
-    response = self._modules.generate_content(
-        model=self._model,
-        contents=self._curated_history + [input_content],
-        config=config if config else self._config,
-    )
-    model_output = (
-        [response.candidates[0].content]
-        if response.candidates and response.candidates[0].content
-        else []
-    )
-    self.record_history(
-        user_input=input_content,
-        model_output=model_output,
-        automatic_function_calling_history=response.automatic_function_calling_history,
-        is_valid=_validate_response(response),
-    )
-    return response
+        input_content = t.t_content(self._modules._api_client, message)
+        response = self._modules.generate_content(
+            model=self._model,
+            contents=self._curated_history + [input_content],
+            config=config if config else self._config,
+        )
+        model_output = (
+            [response.candidates[0].content]
+            if response.candidates and response.candidates[0].content
+            else []
+        )
+        self.record_history(
+            user_input=input_content,
+            model_output=model_output,
+            automatic_function_calling_history=response.automatic_function_calling_history,
+            is_valid=_validate_response(response),
+        )
+        return response
 
-  def send_message_stream(
-      self,
-      message: Union[list[PartUnionDict], PartUnionDict],
-      config: Optional[GenerateContentConfigOrDict] = None,
-  ):
-    """Sends the conversation history with the additional message and yields the model's response in chunks.
-
-    Args:
-      message: The message to send to the model.
-      config: Optional config to override the default Chat config for this
-        request.
-
-    Yields:
-      The model's response in chunks.
-
-    Usage:
-
-    .. code-block:: python
-
-      chat = client.chats.create(model='gemini-1.5-flash')
-      for chunk in chat.send_message_stream('tell me a story'):
-        print(chunk.text)
-    """
-
-    input_content = t.t_content(self._modules._api_client, message)
-    output_contents = []
-    finish_reason = None
-    is_valid = True
-    chunk = None
-    for chunk in self._modules.generate_content_stream(
-        model=self._model,
-        contents=self._curated_history + [input_content],
-        config=config if config else self._config,
+    def send_message_stream(
+        self,
+        message: Union[List[PartUnionDict], PartUnionDict],
+        config: Optional[GenerateContentConfigOrDict] = None,
     ):
-      if not _validate_response(chunk):
-        is_valid = False
-      if chunk.candidates and chunk.candidates[0].content:
-        output_contents.append(chunk.candidates[0].content)
-      if chunk.candidates and chunk.candidates[0].finish_reason:
-        finish_reason = chunk.candidates[0].finish_reason
-      yield chunk
-    self.record_history(
-        user_input=input_content,
-        model_output=output_contents,
-        automatic_function_calling_history=chunk.automatic_function_calling_history,
-        is_valid=is_valid and output_contents and finish_reason,
-    )
+        """Sends the conversation history with the additional message and yields the model's response in chunks.
+
+        Args:
+          message: The message to send to the model.
+          config: Optional config to override the default Chat config for this
+            request.
+
+        Yields:
+          The model's response in chunks.
+
+        Usage:
+
+        .. code-block:: python
+
+          chat = client.chats.create(model='gemini-1.5-flash')
+          for chunk in chat.send_message_stream('tell me a story'):
+            print(chunk.text)
+        """
+
+        input_content = t.t_content(self._modules._api_client, message)
+        output_contents = []
+        finish_reason = None
+        is_valid = True
+        chunk = None
+        for chunk in self._modules.generate_content_stream(
+            model=self._model,
+            contents=self._curated_history + [input_content],
+            config=config if config else self._config,
+        ):
+            if not _validate_response(chunk):
+                is_valid = False
+            if chunk.candidates and chunk.candidates[0].content:
+                output_contents.append(chunk.candidates[0].content)
+            if chunk.candidates and chunk.candidates[0].finish_reason:
+                finish_reason = chunk.candidates[0].finish_reason
+            yield chunk
+        self.record_history(
+            user_input=input_content,
+            model_output=output_contents,
+            automatic_function_calling_history=chunk.automatic_function_calling_history,
+            is_valid=is_valid and output_contents and finish_reason,
+        )
 
 
 class Chats:
-  """A util class to create chat sessions."""
+    """A util class to create chat sessions."""
 
-  def __init__(self, modules: Models):
-    self._modules = modules
+    def __init__(self, modules: Models):
+        self._modules = modules
 
-  def create(
-      self,
-      *,
-      model: str,
-      config: Optional[GenerateContentConfigOrDict] = None,
-      history: Optional[list[Content]] = None,
-  ) -> Chat:
-    """Creates a new chat session.
+    def create(
+        self,
+        *,
+        model: str,
+        config: Optional[GenerateContentConfigOrDict] = None,
+        history: Optional[List[Content]] = None,
+    ) -> Chat:
+        """Creates a new chat session.
 
-    Args:
-      model: The model to use for the chat.
-      config: The configuration to use for the generate content request.
-      history: The history to use for the chat.
+        Args:
+          model: The model to use for the chat.
+          config: The configuration to use for the generate content request.
+          history: The history to use for the chat.
 
-    Returns:
-      A new chat session.
-    """
-    return Chat(
-        modules=self._modules,
-        model=model,
-        config=config,
-        history=history if history else [],
-    )
+        Returns:
+          A new chat session.
+        """
+        return Chat(
+            modules=self._modules,
+            model=model,
+            config=config,
+            history=history if history else [],
+        )
 
 
 class AsyncChat(_BaseChat):
-  """Async chat session."""
+    """Async chat session."""
 
-  async def send_message(
-      self,
-      message: Union[list[PartUnionDict], PartUnionDict],
-      config: Optional[GenerateContentConfigOrDict] = None,
-  ) -> GenerateContentResponse:
-    """Sends the conversation history with the additional message and returns model's response.
+    async def send_message(
+        self,
+        message: Union[List[PartUnionDict], PartUnionDict],
+        config: Optional[GenerateContentConfigOrDict] = None,
+    ) -> GenerateContentResponse:
+        """Sends the conversation history with the additional message and returns model's response.
 
-    Args:
-      message: The message to send to the model.
-      config: Optional config to override the default Chat config for this
-        request.
+        Args:
+          message: The message to send to the model.
+          config: Optional config to override the default Chat config for this
+            request.
 
-    Returns:
-      The model's response.
+        Returns:
+          The model's response.
 
-    Usage:
+        Usage:
 
-    .. code-block:: python
+        .. code-block:: python
 
-      chat = client.aio.chats.create(model='gemini-1.5-flash')
-      response = await chat.send_message('tell me a story')
-    """
+          chat = client.aio.chats.create(model='gemini-1.5-flash')
+          response = await chat.send_message('tell me a story')
+        """
 
-    input_content = t.t_content(self._modules._api_client, message)
-    response = await self._modules.generate_content(
-        model=self._model,
-        contents=self._curated_history + [input_content],
-        config=config if config else self._config,
-    )
-    model_output = (
-        [response.candidates[0].content]
-        if response.candidates and response.candidates[0].content
-        else []
-    )
-    self.record_history(
-        user_input=input_content,
-        model_output=model_output,
-        automatic_function_calling_history=response.automatic_function_calling_history,
-        is_valid=_validate_response(response),
-    )
-    return response
+        input_content = t.t_content(self._modules._api_client, message)
+        response = await self._modules.generate_content(
+            model=self._model,
+            contents=self._curated_history + [input_content],
+            config=config if config else self._config,
+        )
+        model_output = (
+            [response.candidates[0].content]
+            if response.candidates and response.candidates[0].content
+            else []
+        )
+        self.record_history(
+            user_input=input_content,
+            model_output=model_output,
+            automatic_function_calling_history=response.automatic_function_calling_history,
+            is_valid=_validate_response(response),
+        )
+        return response
 
-  async def send_message_stream(
-      self,
-      message: Union[list[PartUnionDict], PartUnionDict],
-      config: Optional[GenerateContentConfigOrDict] = None,
-  ) -> Awaitable[AsyncIterator[GenerateContentResponse]]:
-    """Sends the conversation history with the additional message and yields the model's response in chunks.
+    async def send_message_stream(
+        self,
+        message: Union[List[PartUnionDict], PartUnionDict],
+        config: Optional[GenerateContentConfigOrDict] = None,
+    ) -> Awaitable[AsyncIterator[GenerateContentResponse]]:
+        """Sends the conversation history with the additional message and yields the model's response in chunks.
 
-    Args:
-      message: The message to send to the model.
-      config: Optional config to override the default Chat config for this
-        request.
+        Args:
+          message: The message to send to the model.
+          config: Optional config to override the default Chat config for this
+            request.
 
-    Yields:
-      The model's response in chunks.
+        Yields:
+          The model's response in chunks.
 
-    Usage:
+        Usage:
 
-    .. code-block:: python
-      chat = client.aio.chats.create(model='gemini-1.5-flash')
-      async for chunk in await chat.send_message_stream('tell me a story'):
-        print(chunk.text)
-    """
+        .. code-block:: python
+          chat = client.aio.chats.create(model='gemini-1.5-flash')
+          async for chunk in await chat.send_message_stream('tell me a story'):
+            print(chunk.text)
+        """
 
-    input_content = t.t_content(self._modules._api_client, message)
+        input_content = t.t_content(self._modules._api_client, message)
 
-    async def async_generator():
-      output_contents = []
-      finish_reason = None
-      is_valid = True
-      chunk = None
-      async for chunk in await self._modules.generate_content_stream(
-          model=self._model,
-          contents=self._curated_history + [input_content],
-          config=config if config else self._config,
-      ):
-        if not _validate_response(chunk):
-          is_valid = False
-        if chunk.candidates and chunk.candidates[0].content:
-          output_contents.append(chunk.candidates[0].content)
-        if chunk.candidates and chunk.candidates[0].finish_reason:
-          finish_reason = chunk.candidates[0].finish_reason
-        yield chunk
+        async def async_generator():
+            output_contents = []
+            finish_reason = None
+            is_valid = True
+            chunk = None
+            async for chunk in await self._modules.generate_content_stream(
+                model=self._model,
+                contents=self._curated_history + [input_content],
+                config=config if config else self._config,
+            ):
+                if not _validate_response(chunk):
+                    is_valid = False
+                if chunk.candidates and chunk.candidates[0].content:
+                    output_contents.append(chunk.candidates[0].content)
+                if chunk.candidates and chunk.candidates[0].finish_reason:
+                    finish_reason = chunk.candidates[0].finish_reason
+                yield chunk
 
-      self.record_history(
-          user_input=input_content,
-          model_output=output_contents,
-          automatic_function_calling_history=chunk.automatic_function_calling_history,
-          is_valid=is_valid and output_contents and finish_reason,
+            self.record_history(
+                user_input=input_content,
+                model_output=output_contents,
+                automatic_function_calling_history=chunk.automatic_function_calling_history,
+                is_valid=is_valid and output_contents and finish_reason,
+            )
 
-      )
-    return async_generator()
+        return async_generator()
 
 
 class AsyncChats:
-  """A util class to create async chat sessions."""
+    """A util class to create async chat sessions."""
 
-  def __init__(self, modules: AsyncModels):
-    self._modules = modules
+    def __init__(self, modules: AsyncModels):
+        self._modules = modules
 
-  def create(
-      self,
-      *,
-      model: str,
-      config: Optional[GenerateContentConfigOrDict] = None,
-      history: Optional[list[Content]] = None,
-  ) -> AsyncChat:
-    """Creates a new chat session.
+    def create(
+        self,
+        *,
+        model: str,
+        config: Optional[GenerateContentConfigOrDict] = None,
+        history: Optional[List[Content]] = None,
+    ) -> AsyncChat:
+        """Creates a new chat session.
 
-    Args:
-      model: The model to use for the chat.
-      config: The configuration to use for the generate content request.
-      history: The history to use for the chat.
+        Args:
+          model: The model to use for the chat.
+          config: The configuration to use for the generate content request.
+          history: The history to use for the chat.
 
-    Returns:
-      A new chat session.
-    """
-    return AsyncChat(
-        modules=self._modules,
-        model=model,
-        config=config,
-        history=history if history else [],
-    )
+        Returns:
+          A new chat session.
+        """
+        return AsyncChat(
+            modules=self._modules,
+            model=model,
+            config=config,
+            history=history if history else [],
+        )
